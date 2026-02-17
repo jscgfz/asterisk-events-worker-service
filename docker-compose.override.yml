@@ -1,0 +1,109 @@
+services:
+  asterisk.events.worker:
+    depends_on:
+      asterisk.kafka1.broker:
+        condition: service_healthy
+      asterisk.kafka2.broker:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - asterisk
+    environment:
+      - DOTNET_ENVIRONMENT=${DOTNET_ENVIRONMENT}
+      - DOTNET_USE_POLLING_FILE_WATCHER=${DOTNET_USE_POLLING_FILE_WATCHER}
+      - AmiSerializationOptions:CommandBreak=${DOTNET_AMI_COMMAND_BREAK}
+      - AmiSerializationOptions:LineBreak=${DOTNET_AMI_LINE_BREAK}
+      - AmiSerializationOptions:PropertyBreak=${DOTNET_AMI_PROPERTY_BREAK}
+      - BrokerOptions:ProducerConfig:BootstrapServers=asterisk.kafka1.broker:9092,asterisk.kafka2.broker:9092
+      - BrokerOptions:ProducerConfig:Acks=Leader
+      - BrokerOptions:ProducerConfig:MessageTimeoutMs=10000
+      - BrokerOptions:ProducerConfig:SocketTimeoutMs=30000
+      - BrokerOptions:ProducerConfig:MessageSendMaxRetries=3
+      - BrokerOptions:ConsumerConfig:BootstrapServers=asterisk.kafka1.broker:9092,asterisk.kafka2.broker:9092
+      - BrokerOptions:ConsumerConfig:GroupId=ami-cmd-group
+      - BrokerOptions:ConsumerConfig:AutoOffsetReset=Latest
+      - BrokerOptions:ConsumerConfig:EnableAutoCommit=true
+      - BrokerOptions:ConsumerConfig:TopicBlacklist=resume
+      #- BrokerOptions:ProducerConfig:Debug=all
+    volumes:
+      - ./logs:/app/logs
+      - ./Asterisk.Events.Worker/appsettings.Phone.json:/app/appsettings.Phone.json
+  asterisk.kafka1.broker:
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    networks:
+      - asterisk
+    expose:
+      - "9092"
+      - "9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@asterisk.kafka1.broker:9093,2@asterisk.kafka2.broker:9093
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://asterisk.kafka1.broker:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR}
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${KAFKA_TRANSACTION_STATE_LOG_MIN_ISR}
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: ${KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS}
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
+      CLUSTER_ID: ${CLUSTER_ID}
+  asterisk.kafka2.broker:
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9092 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    networks:
+      - asterisk
+    expose:
+      - "9092"
+      - "9093"
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@asterisk.kafka1.broker:9093,2@asterisk.kafka2.broker:9093
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://asterisk.kafka2.broker:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR}
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${KAFKA_TRANSACTION_STATE_LOG_MIN_ISR}
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: ${KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS}
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
+      CLUSTER_ID: ${CLUSTER_ID}
+networks:
+  asterisk:
+    name: asterisk-net
+    external: false

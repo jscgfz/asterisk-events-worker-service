@@ -1,0 +1,15 @@
+services:
+  asterisk.events.worker:
+    image: ${DOCKER_REGISTRY-}asteriskeventsworker
+    container_name: asterisk.events.worker
+    build:
+      context: .
+      dockerfile: Asterisk.Events.Worker/Dockerfile
+  asterisk.kafka1.broker:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: asterisk.kafka1.broker
+    hostname: asterisk.kafka1.broker
+  asterisk.kafka2.broker:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: asterisk.kafka2.broker
+    hostname: asterisk.kafka2.broker
