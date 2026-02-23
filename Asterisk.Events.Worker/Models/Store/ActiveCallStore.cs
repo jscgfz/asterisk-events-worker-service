@@ -98,6 +98,8 @@ internal sealed class ActiveCallStore
               CompanyId ??= !Type.HasValue || Type.Equals(CallTypes.Inbound) && SwitchBoardConstants.Extensionchannels.IsMatch(channel) ? timeline.GetValueOrDefault("accountcode") : default;
               Nit ??= nitFunc.Invoke(linkedid);
             }
+
+            if(channelstate == "6" && timeline.TryGetValue("timestamp", out string? timestamp)) AttendedDate ??= SwitchBoardResolver.DateFromTimeStamp(timestamp);
           }
           break;
       }
