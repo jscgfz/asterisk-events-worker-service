@@ -2,6 +2,7 @@
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Asterisk.Events.Worker.Abstractions.Services;
+using Asterisk.Events.Worker.Abstractions.Socket;
 using Asterisk.Events.Worker.Models.Options;
 using Asterisk.Events.Worker.Socket;
 using Microsoft.Extensions.Options;
@@ -23,7 +24,7 @@ internal sealed class SwitchBoardEventService(
   private readonly ISwitchBoardSenderService _sender = sender;
   private readonly ILoggerFactory _loggerFactory = loggerFactory;
   private readonly IOptionsMonitor<AmiSerializationOptions> _amiOptions = amiOptions;
-  private AmiConnection _managerConnection = default!;
+  private IAmiConnection _managerConnection = default!;
   private readonly Subject<Dictionary<string, string>> _filterSubject = new();
   private IDisposable? _subscription;
 
@@ -45,8 +46,7 @@ internal sealed class SwitchBoardEventService(
 
   private async Task Connect(TcpConnection connection)
   {
-    _managerConnection = new(connection, _amiOptions.CurrentValue, _loggerFactory.CreateLogger<AmiConnection>());
-    await _managerConnection.Connect();
+    _managerConnection = AmiConnection.New(connection, _amiOptions.CurrentValue, _loggerFactory);
 
     _managerConnection.OnEvent += (s, e) =>
     {
@@ -94,16 +94,6 @@ internal sealed class SwitchBoardEventService(
     });
 
     await _managerConnection.Start();
-
-    byte[] queueStatus = ActionBuilder()
-      .WithActionName("QueueStatus")
-      .Build();
-    byte[] channels = ActionBuilder()
-      .WithActionName("Status")
-      .Build();
-
-    await _managerConnection.Send(queueStatus);
-    await _managerConnection.Send(channels);
   }
 
   public AmiCommandBuilder ActionBuilder()

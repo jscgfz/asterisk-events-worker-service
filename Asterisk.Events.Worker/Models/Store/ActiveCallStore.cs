@@ -42,8 +42,14 @@ internal sealed class ActiveCallStore
       switch (eventName)
       {
         case "Hold":
-          Paused = true;
-          HoldType = HoldTypes.Client;
+          if(
+            timeline.TryGetValue("channelstate", out string? holdcChannelstate) &&
+            holdcChannelstate == "6"
+          )
+          {
+            Paused = true;
+            HoldType = HoldTypes.Client;
+          }
           break;
         case "Unhold":
           Paused = false;
@@ -79,10 +85,11 @@ internal sealed class ActiveCallStore
                   timeline.GetValueOrDefault("data")?.Split(',').FirstOrDefault() : Queue;
                 Queue ??= timeline.GetValueOrDefault("queue");
 
-                PhoneNumber = timeline.GetValueOrDefault(inbound ? "calleridnum" : "exten");
-                ExtensionChannel = !inbound && SwitchBoardConstants.Extensionchannels.IsMatch(channel) ? channel : ExtensionChannel;
+                if(timeline.TryGetValue(inbound ? "calleridnum" : "exten", out string? phone))
+                  PhoneNumber ??= phone.Contains('*') ? phone.Split('*').First() : phone;
+                ExtensionChannel ??= !inbound && SwitchBoardConstants.Extensionchannels.IsMatch(channel) ? channel : ExtensionChannel;
                 CompanyId ??= !inbound && SwitchBoardConstants.Extensionchannels.IsMatch(channel) ? timeline.GetValueOrDefault("accountcode") : default;
-                Nit = nitFunc.Invoke(linkedid);
+                Nit ??= nitFunc.Invoke(linkedid);
               }
             }
             else
