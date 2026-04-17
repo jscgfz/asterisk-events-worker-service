@@ -53,6 +53,18 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
       .SelectMany(f => f.Queues.Select(q => KeyValuePair.Create(q.Key, new QueueViewModel(q.Key, q.Value, f.Id, f.Name, f.Filter))))
       .ToDictionary();
 
+  public string? RemoveMember(string memberId, string queue)
+  {
+    if (Queues.TryGetValue(queue, out QueueViewModel? queuevm))
+    {
+      string key = $"{queue}:{memberId}";
+      _members.TryRemove(key, out _);
+      return queuevm.CompanyId;
+    }
+
+    return null;
+  }
+
   public string? Add(QueueMemberStore queueMember)
   {
     if (Queues.TryGetValue(queueMember.Queue, out QueueViewModel? queue))
