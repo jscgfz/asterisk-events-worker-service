@@ -54,7 +54,6 @@ internal sealed class SwitchBoardCommandService(
 
   private IEnumerable<Task> ResolveCahnges(JsonElement payload)
   {
-    _logger.Log("queuechange {@queues}", payload);
     if (
       payload.TryGetProperty("action", out JsonElement action) &&
       payload.TryGetProperty("members", out JsonElement members) &&
