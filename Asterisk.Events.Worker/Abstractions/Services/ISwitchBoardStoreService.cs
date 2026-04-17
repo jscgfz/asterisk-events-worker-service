@@ -6,6 +6,7 @@ namespace Asterisk.Events.Worker.Abstractions.Services;
 
 internal interface ISwitchBoardStoreService
 {
+  string? RemoveMember(string memberId, string queue);
   string? Add(QueueMemberStore queueMember);
   string? AddTimeline(Dictionary<string, string> channel);
   Task Publish(IEnumerable<string> companies);
