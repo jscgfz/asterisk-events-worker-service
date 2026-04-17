@@ -27,8 +27,8 @@ internal sealed class SwitchBoardSenderService(
   private string? Resolve(Dictionary<string, string> managerEvent)
     => !managerEvent.TryGetValue("event", out string? name) ? null : name switch
     {
-      "QueueMember" => QueueMember(managerEvent),
-      "QueueMemberStatus" => QueueMember(managerEvent),
+      "QueueMember" or "QueueMemberStatus" or "QueueMemberAdded" => QueueMember(managerEvent),
+      "QueueMemberRemoved" => QueueRemove(managerEvent),
       "Hangup" or "AgentComplete" => _store.CloseChannel(managerEvent),
       "Unhold" or "Hold" or "Status" or "Newchannel" or "Newstate" or "AgentConnect" or "Rename" => _store.AddTimeline(managerEvent),
       _ => LogUnhandled(managerEvent)
@@ -39,6 +39,15 @@ internal sealed class SwitchBoardSenderService(
   {
     _logger.LogInformation("Unhandled event {@event}", managerEvent);
     return null;
+  }
+
+  private string? QueueRemove(Dictionary<string, string> queueMember)
+  {
+    string[] sourceArray = ["location", "interface"];
+    return _store.RemoveMember(
+      queueMember.First(p => sourceArray.Contains(p.Key)).Value,
+      queueMember["queue"]
+    );
   }
 
   private string? QueueMember(Dictionary<string, string> queueMember)
