@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Collections.Concurrent;
+using System.Text.Json.Serialization;
 using Asterisk.Events.Worker.Constants;
 using Asterisk.Events.Worker.Resolvers;
 
@@ -6,12 +7,14 @@ namespace Asterisk.Events.Worker.Models.Store;
 
 internal sealed class ActiveCallStore
 {
-  public static ActiveCallStore New() => new();
-  private ActiveCallStore() { }
+  public static ActiveCallStore New(ILogger logger) => new(logger);
+  private ActiveCallStore(ILogger logger) => _logger = logger;
+
+  private readonly ILogger _logger;
 
   internal static readonly IEnumerable<string> inboundContexts = ["trunkinbound", "colas", "verMiem"];
 
-  private IEnumerable<Dictionary<string, string>> Timeline = [];
+  private readonly ConcurrentBag<Dictionary<string, string>> Timeline = [];
 
   public string? PhoneNumber { get; private set; }
   public string? CompanyId { get; private set; }
@@ -21,7 +24,8 @@ internal sealed class ActiveCallStore
   public string? UniqueId { get; private set; }
   public int? State { get; private set; }
   public string? Interface => ExtensionChannel?.Split('-').FirstOrDefault();
-  public IEnumerable<Dictionary<string, string>> Events => Timeline;
+  public IEnumerable<Dictionary<string, string>> Events => Timeline
+    .OrderBy(t => double.Parse(t.GetValueOrDefault("timestamp") ?? "0"));
   public string? Queue { get; private set; }
   public string? Nit { get; private set; }
   public CallTypes? Type { get; private set; }
@@ -31,13 +35,15 @@ internal sealed class ActiveCallStore
   public DateTime? AttendedDate { get; private set; }
 
 
-  public void AddChannel(Dictionary<string, string> timeline, Func<string, string> nitFunc)
+  public void AddChannel(Dictionary<string, string> obj, Func<string, KeyValuePair<string, string>> nitFunc)
   {
+    Dictionary<string, string> timeline = new(obj);
     if (timeline.TryGetValue("event", out string? eventName))
     {
-      Timeline = Timeline
-              .Append(timeline)
-              .OrderBy(t => double.Parse(t.GetValueOrDefault("timestamp") ?? "0"));
+      lock (Timeline)
+      {
+        Timeline.Add(timeline);
+      }
 
       switch (eventName)
       {
@@ -88,18 +94,30 @@ internal sealed class ActiveCallStore
                 if(timeline.TryGetValue(inbound ? "calleridnum" : "exten", out string? phone))
                   PhoneNumber ??= phone.Contains('*') ? phone.Split('*').First() : phone;
                 ExtensionChannel ??= !inbound && SwitchBoardConstants.Extensionchannels.IsMatch(channel) ? channel : ExtensionChannel;
-                CompanyId ??= !inbound && SwitchBoardConstants.Extensionchannels.IsMatch(channel) ? timeline.GetValueOrDefault("accountcode") : default;
-                Nit ??= nitFunc.Invoke(linkedid);
+                if(Nit == null || CompanyId == null)
+                {
+                  KeyValuePair<string, string> pairs = nitFunc.Invoke(linkedid);
+                  Nit ??= pairs.Key;
+                  CompanyId ??= pairs.Value;
+                }
               }
             }
             else
             {
               ExtensionChannel = !Type.HasValue || Type.Equals(CallTypes.Inbound) && SwitchBoardConstants.Extensionchannels.IsMatch(channel) ? channel : ExtensionChannel;
-              CompanyId ??= !Type.HasValue || Type.Equals(CallTypes.Inbound) && SwitchBoardConstants.Extensionchannels.IsMatch(channel) ? timeline.GetValueOrDefault("accountcode") : default;
-              Nit ??= nitFunc.Invoke(linkedid);
+              if (Nit == null || CompanyId == null)
+              {
+                KeyValuePair<string, string> pairs = nitFunc.Invoke(linkedid);
+                Nit ??= pairs.Key;
+                CompanyId ??= pairs.Value;
+              }
             }
 
-            if(channelstate == "6" && timeline.TryGetValue("timestamp", out string? timestamp)) AttendedDate ??= SwitchBoardResolver.DateFromTimeStamp(timestamp);
+            if(channelstate == "6")
+            {
+              _logger.LogWarning("State captured for {linkedId}, {interface}", linkedid, Interface);
+              if(timeline.TryGetValue("timestamp", out string? timestamp)) AttendedDate ??= SwitchBoardResolver.DateFromTimeStamp(timestamp);
+            }
           }
           break;
       }

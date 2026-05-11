@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Asterisk.Events.Worker.Abstractions.Services;
 using Asterisk.Events.Worker.Models.Events;
 using Asterisk.Events.Worker.Models.Options;
@@ -83,6 +84,9 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
       .Select(c => KeyValuePair.Create(c, Resume(c)))
       .OfType<KeyValuePair<string, CompanyResumeVm>>();
 
+    if (resumes.Any(r => r.Key.Equals("promotec", StringComparison.InvariantCultureIgnoreCase)))
+    _logger.LogWarning("resume {@payload}", resumes.First(r => r.Key.Equals("promotec", StringComparison.InvariantCultureIgnoreCase)));
+
     await Task.WhenAll(
       resumes.Select(async r =>
       {
@@ -162,7 +166,7 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
         call.AddChannel(channel, _data.Nit);
       else
       {
-        call = ActiveCallStore.New();
+        call = ActiveCallStore.New(_logger);
         call.AddChannel(channel, _data.Nit);
         _channels.TryAdd(uniqueid, call);
       }

@@ -103,20 +103,26 @@ internal sealed class SwitchBoardDataService(
     return name ?? "unknown";
   }
 
-  public string Nit(string linkkedId)
+  public KeyValuePair<string, string> Nit(string linkkedId)
   {
-    string? nit = null;
+    KeyValuePair<string, string>? nit = null;
     try
     {
       MySqlConnection connection = NitConnection;
       connection.Open();
 
       MySqlCommand command = connection.CreateCommand();
-      command.CommandText = "select ci.cedula from cedulaIVR as ci where ci.linkedid = @id limit 1";
+      command.CommandText = "select ci.cedula, ci.empresa from cedulaIVR as ci where ci.linkedid = @id limit 1";
       command.Parameters.AddWithValue("@id", linkkedId);
       using MySqlDataReader reader = command.ExecuteReader();
       while (reader.Read())
-        nit = reader.GetString("cedula");
+      {
+        nit = KeyValuePair.Create(
+          reader.GetString("cedula"),
+          reader.GetString("empresa").Replace("ivr", string.Empty)
+        );
+
+      }
       connection.Close();
     }
     catch (MySqlException ex)
@@ -124,6 +130,6 @@ internal sealed class SwitchBoardDataService(
       _logger.LogError(ex, "Error retrieving names");
     }
 
-    return nit ?? "unknown";
+    return nit ?? KeyValuePair.Create("unknown", "unknown");
   }
 }

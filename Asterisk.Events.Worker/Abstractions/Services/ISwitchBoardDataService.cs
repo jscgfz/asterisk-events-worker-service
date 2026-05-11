@@ -3,5 +3,5 @@
 internal interface ISwitchBoardDataService
 {
   string Name(string @interface);
-  string Nit(string linkedId);
+  KeyValuePair<string, string> Nit(string linkedId);
 }

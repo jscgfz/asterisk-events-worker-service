@@ -1,4 +1,5 @@
-﻿using Asterisk.Events.Worker.Abstractions.Services;
+﻿using System.Text.Json;
+using Asterisk.Events.Worker.Abstractions.Services;
 using Asterisk.Events.Worker.Models.Store;
 using Asterisk.Events.Worker.Resolvers;
 
@@ -18,7 +19,11 @@ internal sealed class SwitchBoardSenderService(
   {
     IEnumerable<string?> changes = [];// buffer.Select(Resolve);
     foreach (Dictionary<string, string> iter in buffer)
+    {
+      string msg = JsonSerializer.Serialize(iter, JsonSerializerOptions.Web);
+      //if (msg.Contains("2416")) _logger.LogWarning("e {event}", msg);
       changes = changes.Append(Resolve(iter));
+    }
 
     IEnumerable<string> filter = changes.OfType<string>().Distinct();
     if (filter.Any()) await _store.Publish(filter);
