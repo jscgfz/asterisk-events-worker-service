@@ -14,7 +14,7 @@ internal sealed class ActiveCallStore
 
   internal static readonly IEnumerable<string> inboundContexts = ["trunkinbound", "colas", "verMiem"];
 
-  private readonly ConcurrentBag<Dictionary<string, string>> Timeline = [];
+  private readonly ConcurrentQueue<Dictionary<string, string>> Timeline = [];
 
   public string? PhoneNumber { get; private set; }
   public string? CompanyId { get; private set; }
@@ -42,7 +42,7 @@ internal sealed class ActiveCallStore
     {
       lock (Timeline)
       {
-        Timeline.Add(timeline);
+        Timeline.Enqueue(timeline);
       }
 
       switch (eventName)
@@ -115,9 +115,12 @@ internal sealed class ActiveCallStore
 
             if(channelstate == "6")
             {
-              _logger.LogWarning("State captured for {linkedId}, {interface}", linkedid, Interface);
+              //_logger.LogWarning("State captured for {linkedId}, {interface}", linkedid, Interface);
               if(timeline.TryGetValue("timestamp", out string? timestamp)) AttendedDate ??= SwitchBoardResolver.DateFromTimeStamp(timestamp);
             }
+
+            if (!string.IsNullOrWhiteSpace(CompanyId) && CompanyId.Equals("unknown", StringComparison.InvariantCultureIgnoreCase) && timeline.TryGetValue("accountcode", out string? accountcode))
+              CompanyId = accountcode;
           }
           break;
       }
