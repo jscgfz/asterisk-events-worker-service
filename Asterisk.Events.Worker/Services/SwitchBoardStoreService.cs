@@ -114,10 +114,6 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
       .Where(q => q.Value.CompanyId == companyId)
       .Select(q => q.Key);
 
-    Dictionary<string, QueueCallerWaitingStore> waiting = _waiting
-      .Where(w => queues.Contains(w.Value.Queue))
-      .ToDictionary();
-
     IEnumerable<ActiveCallStore> outboundChannels = _channels.Values
       .Where(c => c.Type == CallTypes.OutBound && c.CompanyId == companyId)
       .Where(o => !string.IsNullOrWhiteSpace(o.ExtensionChannel) && !string.IsNullOrWhiteSpace(o.UniqueId));
@@ -138,6 +134,10 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
               c => c.Interface,
               (m, c) => c
             );
+
+            Dictionary<string, QueueCallerWaitingStore> waiting = _waiting
+              .Where(w => w.Value.Queue == k)
+              .ToDictionary();
 
             return new InBoundResume(
               members,
