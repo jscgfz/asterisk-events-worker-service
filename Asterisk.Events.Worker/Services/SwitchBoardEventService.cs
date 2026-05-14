@@ -87,6 +87,11 @@ internal sealed class SwitchBoardEventService(
         "Newchannel",
         "Newstate",
         "Rename",
+        "QueueCallerJoin",
+        "QueueEntry",
+        "QueueCallerAbandon",
+        "QueueCallerLeave",
+        "custom-QueueCallerJoin"
       ];
 
       if (e.TryGetValue("event", out string? name) && includedEvents.Contains(name))
@@ -131,4 +136,7 @@ internal sealed class SwitchBoardEventService(
 
   public Task SendAction(byte[] action)
     => _managerConnection.Send(action);
+
+  public void AppenCustomEvent(Dictionary<string, string> @event)
+    => _filterSubject.OnNext(@event);
 }

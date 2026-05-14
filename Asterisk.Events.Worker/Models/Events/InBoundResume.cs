@@ -9,5 +9,6 @@ internal sealed record InBoundResume(
   Dictionary<string, QueueMemberStore> Disconected,
   [property: JsonPropertyName("in_call")] Dictionary<string, ActiveCallStore> InCall,
   Dictionary<string, object?> Paused,
-  Dictionary<string, ActiveCallStore> Ringing
+  Dictionary<string, ActiveCallStore> Ringing,
+  [property: JsonPropertyName("in_queue")] Dictionary<string, QueueCallerWaitingStore> InQueue
 );

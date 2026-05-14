@@ -11,4 +11,6 @@ internal interface ISwitchBoardStoreService
   string? AddTimeline(Dictionary<string, string> channel);
   Task Publish(IEnumerable<string> companies);
   string? CloseChannel(Dictionary<string, string> channel);
+  string? Entry(Dictionary<string, string> entry);
+  string? DropEntry(Dictionary<string, string> entry);
 }

@@ -18,11 +18,13 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
   private readonly IOptionsMonitor<SwitchBoard> _options;
   private readonly ILogger<SwitchBoardStoreService> _logger;
   private readonly ISwitchBoardDataService _data;
+  //private readonly ISwitchBoardEventService _events;
   private readonly IProducer<string, string> _producer;
 
   private Dictionary<string, QueueViewModel> Queues;
   private readonly ConcurrentDictionary<string, QueueMemberStore> _members = new();
   private readonly ConcurrentDictionary<string, ActiveCallStore> _channels = new();
+  private readonly ConcurrentDictionary<string, QueueCallerWaitingStore> _waiting = new();
 
   private static readonly IEnumerable<int> _disconnectedStatus = [0, 4, 5];
   private static readonly IEnumerable<int> _availableStatus = [1, 2, 3, 6, 7, 8];
@@ -34,6 +36,7 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
     IOptionsMonitor<SwitchBoard> options,
     ILogger<SwitchBoardStoreService> logger,
     ISwitchBoardDataService data,
+    //ISwitchBoardEventService events,
     IProducer<string, string> producer
   )
   {
@@ -46,6 +49,7 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
     {
       Queues = ArmQueues(opt.EventsConnection);
     });
+    //_events = events;
   }
 
   private static Dictionary<string, QueueViewModel> ArmQueues(TcpConnection tcp)
@@ -84,9 +88,6 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
       .Select(c => KeyValuePair.Create(c, Resume(c)))
       .OfType<KeyValuePair<string, CompanyResumeVm>>();
 
-    if (resumes.Any(r => r.Key.Equals("promotec", StringComparison.InvariantCultureIgnoreCase)))
-    _logger.LogWarning("resume {@payload}", resumes.First(r => r.Key.Equals("promotec", StringComparison.InvariantCultureIgnoreCase)));
-
     await Task.WhenAll(
       resumes.Select(async r =>
       {
@@ -112,6 +113,10 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
     IEnumerable<string> queues = Queues
       .Where(q => q.Value.CompanyId == companyId)
       .Select(q => q.Key);
+
+    Dictionary<string, QueueCallerWaitingStore> waiting = _waiting
+      .Where(w => queues.Contains(w.Value.Queue))
+      .ToDictionary();
 
     IEnumerable<ActiveCallStore> outboundChannels = _channels.Values
       .Where(c => c.Type == CallTypes.OutBound && c.CompanyId == companyId)
@@ -143,7 +148,8 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
                 .Select(m => KeyValuePair.Create(m.Key, m.Value.Paused ? (object?)m.Value : inboundChannels.FirstOrDefault(i => i.Interface == m.Value.Interface)))
                 .DistinctBy(k => k.Key)
                 .ToDictionary(),
-              inboundChannels.Where(c => c.State.HasValue && _ringingChannelStatus.Contains(c.State.Value) && (!c.Paused.HasValue || !c.Paused.Value)).DistinctBy(k => k.Interface).ToDictionary(k => k.Interface!, k => k)
+              inboundChannels.Where(c => c.State.HasValue && _ringingChannelStatus.Contains(c.State.Value) && (!c.Paused.HasValue || !c.Paused.Value)).DistinctBy(k => k.Interface).ToDictionary(k => k.Interface!, k => k),
+              waiting
             );
           }
         ),
@@ -162,6 +168,7 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
   {
     if (channel.TryGetValue("uniqueid", out string? uniqueid))
     {
+      //_waiting.TryRemove(uniqueid, out _);
       if (_channels.TryGetValue(uniqueid, out ActiveCallStore? call))
         call.AddChannel(channel, _data.Nit);
       else
@@ -176,6 +183,8 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
         return call.CompanyId;
 
       if (channel.TryGetValue("linkedid", out string? linkedid))
+      {
+        //_waiting.TryRemove(linkedid, out _);
         if (uniqueid == linkedid)
           foreach (string key in _channels.Where(c => c.Value.LinkedId == linkedid).Select(c => c.Key))
             _channels[key].AddChannel(channel, _data.Nit);
@@ -185,6 +194,7 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
         )
           foreach (Dictionary<string, string> mainEvent in mainChannel.Events)
             call.AddChannel(mainEvent, _data.Nit);
+      }
     }
 
     return null;
@@ -200,6 +210,51 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
         else if (Queues.Values.Any(q => q.CompanyId == call.CompanyId))
           return call.CompanyId;
     }
+    return null;
+  }
+
+  public string? Entry(Dictionary<string, string> entry)
+  {
+    QueueCallerWaitingStore store = QueueCallerWaitingStore.FromEntry(entry);
+    if (Queues.TryGetValue(store.Queue, out QueueViewModel? model))
+    {
+      _waiting.AddOrUpdate(
+        store.UniqueId,
+        _ => store,
+        (_, _) => store
+      );
+      return model.CompanyId;
+    }
+    return null;
+  }
+
+  public string? DropEntry(Dictionary<string, string> entry)
+  {
+    if(
+      entry.TryGetValue("queue", out string? queue) &&
+      Queues.TryGetValue(queue, out QueueViewModel? model)
+    )
+    {
+      foreach (string key in new[] { entry.GetValueOrDefault("uniqueid"), entry.GetValueOrDefault("linkedid") }.OfType<string>())
+        if(_waiting.TryRemove(key, out QueueCallerWaitingStore? waiting))
+        {
+          Dictionary<string, string> copy = new(waiting.Event)
+          {
+            ["event"] = "custom-QueueCallerJoin"
+          };
+          _producer.Produce(
+            "ami-commands",
+            new()
+            {
+              Key = "custom-event",
+              Value = JsonSerializer.Serialize(copy)
+            }
+          );
+        }
+
+      return model.CompanyId;
+    }
+
     return null;
   }
 }

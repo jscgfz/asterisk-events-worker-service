@@ -61,6 +61,10 @@ internal sealed class ActiveCallStore
           Paused = false;
           HoldType = HoldTypes.Client;
           break;
+        case "custom-QueueCallerJoin":
+          if (timeline.TryGetValue("queue", out string? queue))
+            Queue = queue;
+          break;
         default:
           if (
             timeline.TryGetValue("channel", out string? channel) &&

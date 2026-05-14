@@ -7,4 +7,5 @@ internal interface ISwitchBoardEventService
   Task SendAction(AmiCommandBuilder builder);
   Task SendAction(byte[] action);
   AmiCommandBuilder ActionBuilder();
+  void AppenCustomEvent(Dictionary<string, string> @event);
 }

@@ -19,11 +19,7 @@ internal sealed class SwitchBoardSenderService(
   {
     IEnumerable<string?> changes = [];// buffer.Select(Resolve);
     foreach (Dictionary<string, string> iter in buffer)
-    {
-      string msg = JsonSerializer.Serialize(iter, JsonSerializerOptions.Web);
-      //if (msg.Contains("2416")) _logger.LogWarning("e {event}", msg);
       changes = changes.Append(Resolve(iter));
-    }
 
     IEnumerable<string> filter = changes.OfType<string>().Distinct();
     if (filter.Any()) await _store.Publish(filter);
@@ -35,7 +31,9 @@ internal sealed class SwitchBoardSenderService(
       "QueueMember" or "QueueMemberStatus" or "QueueMemberAdded" => QueueMember(managerEvent),
       "QueueMemberRemoved" => QueueRemove(managerEvent),
       "Hangup" or "AgentComplete" => _store.CloseChannel(managerEvent),
-      "Unhold" or "Hold" or "Status" or "Newchannel" or "Newstate" or "AgentConnect" or "Rename" => _store.AddTimeline(managerEvent),
+      "Unhold" or "Hold" or "Status" or "Newchannel" or "Newstate" or "AgentConnect" or "Rename" or "custom-QueueCallerJoin" => _store.AddTimeline(managerEvent),
+      "QueueCallerJoin" or "QueueEntry" => _store.Entry(managerEvent),
+      "QueueCallerAbandon" or "QueueCallerLeave" => _store.DropEntry(managerEvent),
       _ => LogUnhandled(managerEvent)
       //_ => null
     };

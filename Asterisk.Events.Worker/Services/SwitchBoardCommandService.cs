@@ -43,6 +43,11 @@ internal sealed class SwitchBoardCommandService(
               ResolveCahnges(JsonSerializer.Deserialize<JsonElement>(result.Message.Value))
             );
             break;
+          case "custom-event":
+            _events.AppenCustomEvent(
+              JsonSerializer.Deserialize<Dictionary<string, string>>(result.Message.Value)!
+            );
+            break;
         }
       }
       catch (ConsumeException e)
