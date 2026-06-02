@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using Asterisk.Events.Worker.Constants;
+using Asterisk.Events.Worker.Models.ViewModels;
 using Asterisk.Events.Worker.Resolvers;
 
 namespace Asterisk.Events.Worker.Models.Store;
@@ -35,7 +36,7 @@ internal sealed class ActiveCallStore
   public DateTime? AttendedDate { get; private set; }
 
 
-  public void AddChannel(Dictionary<string, string> obj, Func<string, KeyValuePair<string, string>> nitFunc)
+  public void AddChannel(Dictionary<string, string> obj, Func<string, EntryCallViewModel> nitFunc)
   {
     Dictionary<string, string> timeline = new(obj);
     if (timeline.TryGetValue("event", out string? eventName))
@@ -96,13 +97,14 @@ internal sealed class ActiveCallStore
                 Queue ??= timeline.GetValueOrDefault("queue");
 
                 if(timeline.TryGetValue(inbound ? "calleridnum" : "exten", out string? phone))
-                  PhoneNumber ??= phone.Contains('*') ? phone.Split('*').First() : phone;
+                  PhoneNumber = phone.Contains('*') ? phone.Split('*').First() : phone;
                 ExtensionChannel ??= !inbound && SwitchBoardConstants.Extensionchannels.IsMatch(channel) ? channel : ExtensionChannel;
-                if(Nit == null || CompanyId == null)
+                if(Nit == null || CompanyId == null || PhoneNumber == null)
                 {
-                  KeyValuePair<string, string> pairs = nitFunc.Invoke(linkedid);
-                  Nit ??= pairs.Key;
-                  CompanyId ??= pairs.Value;
+                  EntryCallViewModel pairs = nitFunc.Invoke(linkedid);
+                  Nit ??= pairs.Nit;
+                  CompanyId ??= pairs.CompanyId;
+                  PhoneNumber ??= pairs.PhoneNumber;
                 }
               }
             }
@@ -111,9 +113,10 @@ internal sealed class ActiveCallStore
               ExtensionChannel = !Type.HasValue || Type.Equals(CallTypes.Inbound) && SwitchBoardConstants.Extensionchannels.IsMatch(channel) ? channel : ExtensionChannel;
               if (Nit == null || CompanyId == null)
               {
-                KeyValuePair<string, string> pairs = nitFunc.Invoke(linkedid);
-                Nit ??= pairs.Key;
-                CompanyId ??= pairs.Value;
+                EntryCallViewModel pairs = nitFunc.Invoke(linkedid);
+                Nit ??= pairs.Nit;
+                CompanyId ??= pairs.CompanyId;
+                PhoneNumber ??= pairs.PhoneNumber;
               }
             }
 

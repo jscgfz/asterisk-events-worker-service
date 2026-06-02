@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using Asterisk.Events.Worker.Abstractions.Services;
 using Asterisk.Events.Worker.Models.Options;
+using Asterisk.Events.Worker.Models.ViewModels;
 using Microsoft.Extensions.Options;
 using MySql.Data.MySqlClient;
 
@@ -103,23 +104,24 @@ internal sealed class SwitchBoardDataService(
     return name ?? "unknown";
   }
 
-  public KeyValuePair<string, string> Nit(string linkkedId)
+  public EntryCallViewModel Nit(string linkkedId)
   {
-    KeyValuePair<string, string>? nit = null;
+    EntryCallViewModel? nit = null;
     try
     {
       MySqlConnection connection = NitConnection;
       connection.Open();
 
       MySqlCommand command = connection.CreateCommand();
-      command.CommandText = "select ci.cedula, ci.empresa from cedulaIVR as ci where ci.linkedid = @id limit 1";
+      command.CommandText = "select ci.cedula, ci.empresa, ci.num_cliente from cedulaIVR as ci where ci.linkedid = @id limit 1";
       command.Parameters.AddWithValue("@id", linkkedId);
       using MySqlDataReader reader = command.ExecuteReader();
       while (reader.Read())
       {
-        nit = KeyValuePair.Create(
+        nit = new EntryCallViewModel(
           reader.GetString("cedula"),
-          reader.GetString("empresa").Replace("ivr", string.Empty)
+          reader.GetString("empresa").Replace("ivr", string.Empty),
+          reader.GetString("num_cliente")
         );
 
       }
@@ -130,6 +132,6 @@ internal sealed class SwitchBoardDataService(
       _logger.LogError(ex, "Error retrieving names");
     }
 
-    return nit ?? KeyValuePair.Create("unknown", "unknown");
+    return nit ?? new EntryCallViewModel("unknown", "unknown", "unknown");// KeyValuePair.Create("unknown", "unknown");
   }
 }
