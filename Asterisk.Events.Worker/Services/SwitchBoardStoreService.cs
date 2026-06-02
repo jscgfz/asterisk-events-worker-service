@@ -143,20 +143,35 @@ internal sealed class SwitchBoardStoreService : ISwitchBoardStoreService
               members,
               members.Where(m => _availableStatus.Contains(m.Value.Status) && !m.Value.Paused && !_channels.Any(c => c.Value.Interface == m.Key)).DistinctBy(k => k.Key).ToDictionary(),
               members.Where(m => _disconnectedStatus.Contains(m.Value.Status)).DistinctBy(k => k.Key).ToDictionary(),
-              inboundChannels.Where(c => c.State.HasValue && _availableChannelStatus.Contains(c.State.Value) && (!c.Paused.HasValue || !c.Paused.Value)).DistinctBy(k => k.Interface).ToDictionary(k => k.Interface!, k => k),
+              inboundChannels
+                .GroupBy(ic => ic.LinkedId)
+                .Select(ic => ic.MaxBy(max => max.State)!)
+                .Where(c => c.State.HasValue && _availableChannelStatus.Contains(c.State.Value) && (!c.Paused.HasValue || !c.Paused.Value)).DistinctBy(k => k.Interface).ToDictionary(k => k.Interface!, k => k),
               members.Where(m => _availableStatus.Contains(m.Value.Status) && m.Value.Paused || inboundChannels.Any(c => c.Interface == m.Value.Interface && c.Paused.HasValue && c.Paused.Value))
                 .Select(m => KeyValuePair.Create(m.Key, m.Value.Paused ? (object?)m.Value : inboundChannels.FirstOrDefault(i => i.Interface == m.Value.Interface)))
                 .DistinctBy(k => k.Key)
                 .ToDictionary(),
-              inboundChannels.Where(c => c.State.HasValue && _ringingChannelStatus.Contains(c.State.Value) && (!c.Paused.HasValue || !c.Paused.Value)).DistinctBy(k => k.Interface).ToDictionary(k => k.Interface!, k => k),
+              inboundChannels
+                .GroupBy(ic => ic.LinkedId)
+                .Select(ic => ic.MaxBy(max => max.State)!)
+                .Where(c => c.State.HasValue && _ringingChannelStatus.Contains(c.State.Value) && (!c.Paused.HasValue || !c.Paused.Value)).DistinctBy(k => k.Interface).ToDictionary(k => k.Interface!, k => k),
               waiting
             );
           }
         ),
         new(
-          outboundChannels.Where(c => c.State.HasValue && _availableChannelStatus.Contains(c.State.Value) && (!c.Paused.HasValue || !c.Paused.Value)).DistinctBy(k => k.Interface).ToDictionary(k => k.UniqueId!, k => k),
-          outboundChannels.Where(c => c.Paused.HasValue && c.Paused.Value).DistinctBy(k => k.Interface).ToDictionary(k => k.UniqueId!, k => k),
-          outboundChannels.Where(c => c.State.HasValue && _ringingChannelStatus.Contains(c.State.Value) && (!c.Paused.HasValue || !c.Paused.Value)).DistinctBy(k => k.Interface).ToDictionary(k => k.UniqueId!, k => k)
+          outboundChannels
+            .GroupBy(ic => ic.LinkedId)
+            .Select(ic => ic.MaxBy(max => max.State)!)
+            .Where(c => c.State.HasValue && _availableChannelStatus.Contains(c.State.Value) && (!c.Paused.HasValue || !c.Paused.Value)).DistinctBy(k => k.Interface).ToDictionary(k => k.UniqueId!, k => k),
+          outboundChannels
+            .GroupBy(ic => ic.LinkedId)
+            .Select(ic => ic.MaxBy(max => max.State)!)
+            .Where(c => c.Paused.HasValue && c.Paused.Value).DistinctBy(k => k.Interface).ToDictionary(k => k.UniqueId!, k => k),
+          outboundChannels
+            .GroupBy(ic => ic.LinkedId)
+            .Select(ic => ic.MaxBy(max => max.State)!)
+            .Where(c => c.State.HasValue && _ringingChannelStatus.Contains(c.State.Value) && (!c.Paused.HasValue || !c.Paused.Value)).DistinctBy(k => k.Interface).ToDictionary(k => k.UniqueId!, k => k)
         )
     );
   }
